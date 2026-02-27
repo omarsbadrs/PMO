@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import DataTable, { Column } from '@/components/shared/DataTable'
+import CsvImportButton from '@/components/shared/CsvImportButton'
 import type { QlInspection } from '@/types/app'
 import { getUserModuleRole } from '@/lib/auth/helpers'
 
@@ -16,6 +17,17 @@ const columns: Column<QlInspection>[] = [
   { key: 'inspection_date', header: 'Date', type: 'date', className: 'w-32' },
   { key: 'result', header: 'Result', type: 'result_badge', className: 'w-28' },
   { key: 'status', header: 'Status', type: 'status', className: 'w-28' },
+]
+
+const importColumns = [
+  { key: 'inspection_number', label: 'Inspection Number' },
+  { key: 'title', label: 'Title', required: true },
+  { key: 'type', label: 'Type' },
+  { key: 'description', label: 'Description' },
+  { key: 'inspection_date', label: 'Inspection Date' },
+  { key: 'result', label: 'Result' },
+  { key: 'status', label: 'Status' },
+  { key: 'notes', label: 'Notes' },
 ]
 
 export default async function InspectionsPage({ params }: Props) {
@@ -31,7 +43,12 @@ export default async function InspectionsPage({ params }: Props) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div><h1 className="text-xl font-bold">Inspections</h1><p className="text-sm text-gray-500">ITP checks and inspections</p></div>
-        {canWrite && <Button asChild><Link href={`/projects/${projectId}/quality/inspections/new`}><Plus className="w-4 h-4 mr-2" />Add Inspection</Link></Button>}
+        {canWrite && (
+          <div className="flex gap-2">
+            <CsvImportButton table="ql_inspections" projectId={projectId} importColumns={importColumns} />
+            <Button asChild><Link href={`/projects/${projectId}/quality/inspections/new`}><Plus className="w-4 h-4 mr-2" />Add Inspection</Link></Button>
+          </div>
+        )}
       </div>
       <DataTable columns={columns} data={data ?? []} total={data?.length ?? 0} emptyMessage="No inspections recorded." />
     </div>

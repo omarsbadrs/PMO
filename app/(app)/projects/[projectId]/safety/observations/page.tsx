@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import DataTable, { Column } from '@/components/shared/DataTable'
+import CsvImportButton from '@/components/shared/CsvImportButton'
 import type { SfObservation } from '@/types/app'
 import { getUserModuleRole } from '@/lib/auth/helpers'
 
@@ -16,6 +17,17 @@ const columns: Column<SfObservation>[] = [
   { key: 'location', header: 'Location', className: 'w-32' },
   { key: 'observed_date', header: 'Date', type: 'date', className: 'w-32' },
   { key: 'status', header: 'Status', type: 'status', className: 'w-24' },
+]
+
+const importColumns = [
+  { key: 'observation_number', label: 'Observation Number' },
+  { key: 'type', label: 'Type' },
+  { key: 'description', label: 'Description', required: true },
+  { key: 'location', label: 'Location' },
+  { key: 'observed_date', label: 'Observed Date' },
+  { key: 'status', label: 'Status' },
+  { key: 'corrective_action', label: 'Corrective Action' },
+  { key: 'closed_date', label: 'Closed Date' },
 ]
 
 export default async function ObservationsPage({ params }: Props) {
@@ -31,7 +43,12 @@ export default async function ObservationsPage({ params }: Props) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div><h1 className="text-xl font-bold">Observations</h1><p className="text-sm text-gray-500">Safety walks and observations</p></div>
-        {canWrite && <Button asChild><Link href={`/projects/${projectId}/safety/observations/new`}><Plus className="w-4 h-4 mr-2" />Add Observation</Link></Button>}
+        {canWrite && (
+          <div className="flex gap-2">
+            <CsvImportButton table="sf_observations" projectId={projectId} importColumns={importColumns} />
+            <Button asChild><Link href={`/projects/${projectId}/safety/observations/new`}><Plus className="w-4 h-4 mr-2" />Add Observation</Link></Button>
+          </div>
+        )}
       </div>
       <DataTable columns={columns} data={data ?? []} total={data?.length ?? 0} emptyMessage="No observations recorded." />
     </div>

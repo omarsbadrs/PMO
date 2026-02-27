@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import DataTable, { Column } from '@/components/shared/DataTable'
+import CsvImportButton from '@/components/shared/CsvImportButton'
 import type { CcBudget } from '@/types/app'
 import { getUserModuleRole } from '@/lib/auth/helpers'
 
@@ -16,6 +17,17 @@ const columns: Column<CcBudget>[] = [
   { key: 'baseline_amount', header: 'Baseline', type: 'currency', className: 'text-right w-36' },
   { key: 'approved_amount', header: 'Approved', type: 'currency', className: 'text-right w-36' },
   { key: 'status', header: 'Status', type: 'status', className: 'w-28' },
+]
+
+const importColumns = [
+  { key: 'code', label: 'Code' },
+  { key: 'description', label: 'Description', required: true },
+  { key: 'discipline', label: 'Discipline' },
+  { key: 'baseline_amount', label: 'Baseline Amount' },
+  { key: 'approved_amount', label: 'Approved Amount' },
+  { key: 'revision_number', label: 'Revision Number' },
+  { key: 'status', label: 'Status' },
+  { key: 'notes', label: 'Notes' },
 ]
 
 export default async function BudgetPage({ params }: Props) {
@@ -43,11 +55,14 @@ export default async function BudgetPage({ params }: Props) {
           <p className="text-sm text-gray-500">Baseline and approved budget items</p>
         </div>
         {canWrite && (
-          <Button asChild>
-            <Link href={`/projects/${projectId}/cost-control/budget/new`}>
-              <Plus className="w-4 h-4 mr-2" /> Add Budget Item
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <CsvImportButton table="cc_budget" projectId={projectId} importColumns={importColumns} />
+            <Button asChild>
+              <Link href={`/projects/${projectId}/cost-control/budget/new`}>
+                <Plus className="w-4 h-4 mr-2" /> Add Budget Item
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
 

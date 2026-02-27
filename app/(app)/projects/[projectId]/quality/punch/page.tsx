@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import DataTable, { Column } from '@/components/shared/DataTable'
+import CsvImportButton from '@/components/shared/CsvImportButton'
 import type { QlPunch } from '@/types/app'
 import { getUserModuleRole } from '@/lib/auth/helpers'
 
@@ -19,6 +20,17 @@ const columns: Column<QlPunch>[] = [
   { key: 'status', header: 'Status', type: 'status', className: 'w-24' },
 ]
 
+const importColumns = [
+  { key: 'punch_number', label: 'Punch Number' },
+  { key: 'title', label: 'Title', required: true },
+  { key: 'description', label: 'Description' },
+  { key: 'category', label: 'Category' },
+  { key: 'area', label: 'Area' },
+  { key: 'raised_date', label: 'Raised Date' },
+  { key: 'due_date', label: 'Due Date' },
+  { key: 'status', label: 'Status' },
+]
+
 export default async function PunchPage({ params }: Props) {
   const { projectId } = await params
   const supabase = await createClient()
@@ -32,7 +44,12 @@ export default async function PunchPage({ params }: Props) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div><h1 className="text-xl font-bold">Punch List</h1></div>
-        {canWrite && <Button asChild><Link href={`/projects/${projectId}/quality/punch/new`}><Plus className="w-4 h-4 mr-2" />Add Item</Link></Button>}
+        {canWrite && (
+          <div className="flex gap-2">
+            <CsvImportButton table="ql_punch" projectId={projectId} importColumns={importColumns} />
+            <Button asChild><Link href={`/projects/${projectId}/quality/punch/new`}><Plus className="w-4 h-4 mr-2" />Add Item</Link></Button>
+          </div>
+        )}
       </div>
       <DataTable columns={columns} data={data ?? []} total={data?.length ?? 0} emptyMessage="No punch items." />
     </div>

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import DataTable, { Column } from '@/components/shared/DataTable'
+import CsvImportButton from '@/components/shared/CsvImportButton'
 import type { SfIncident } from '@/types/app'
 import { getUserModuleRole } from '@/lib/auth/helpers'
 
@@ -16,6 +17,18 @@ const columns: Column<SfIncident>[] = [
   { key: 'incident_date', header: 'Date', type: 'date', className: 'w-32' },
   { key: 'location', header: 'Location', className: 'w-32' },
   { key: 'status', header: 'Status', type: 'status', className: 'w-24' },
+]
+
+const importColumns = [
+  { key: 'incident_number', label: 'Incident Number' },
+  { key: 'title', label: 'Title', required: true },
+  { key: 'description', label: 'Description' },
+  { key: 'severity', label: 'Severity' },
+  { key: 'incident_date', label: 'Incident Date' },
+  { key: 'location', label: 'Location' },
+  { key: 'injured_person', label: 'Injured Person' },
+  { key: 'root_cause', label: 'Root Cause' },
+  { key: 'status', label: 'Status' },
 ]
 
 export default async function IncidentsPage({ params }: Props) {
@@ -31,7 +44,12 @@ export default async function IncidentsPage({ params }: Props) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div><h1 className="text-xl font-bold">Incidents</h1><p className="text-sm text-gray-500">Near-misses, first aid, LTIs and fatalities</p></div>
-        {canWrite && <Button asChild><Link href={`/projects/${projectId}/safety/incidents/new`}><Plus className="w-4 h-4 mr-2" />Report Incident</Link></Button>}
+        {canWrite && (
+          <div className="flex gap-2">
+            <CsvImportButton table="sf_incidents" projectId={projectId} importColumns={importColumns} />
+            <Button asChild><Link href={`/projects/${projectId}/safety/incidents/new`}><Plus className="w-4 h-4 mr-2" />Report Incident</Link></Button>
+          </div>
+        )}
       </div>
       <DataTable columns={columns} data={data ?? []} total={data?.length ?? 0} emptyMessage="No incidents recorded." />
     </div>

@@ -4,10 +4,22 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import DataTable, { Column } from '@/components/shared/DataTable'
+import CsvImportButton from '@/components/shared/CsvImportButton'
 import type { CcCommitment } from '@/types/app'
 import { getUserModuleRole } from '@/lib/auth/helpers'
 
 interface Props { params: Promise<{ projectId: string }> }
+
+const importColumns = [
+  { key: 'po_number', label: 'PO Number' },
+  { key: 'vendor', label: 'Vendor', required: true },
+  { key: 'description', label: 'Description', required: true },
+  { key: 'amount', label: 'Amount' },
+  { key: 'currency', label: 'Currency' },
+  { key: 'status', label: 'Status' },
+  { key: 'issue_date', label: 'Issue Date' },
+  { key: 'expiry_date', label: 'Expiry Date' },
+]
 
 const columns: Column<CcCommitment>[] = [
   { key: 'po_number', header: 'PO #', className: 'w-28 font-mono text-sm' },
@@ -39,11 +51,14 @@ export default async function CommitmentsPage({ params }: Props) {
           <p className="text-sm text-gray-500">Purchase orders and subcontracts</p>
         </div>
         {canWrite && (
-          <Button asChild>
-            <Link href={`/projects/${projectId}/cost-control/commitments/new`}>
-              <Plus className="w-4 h-4 mr-2" /> Add Commitment
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <CsvImportButton table="cc_commitments" projectId={projectId} importColumns={importColumns} />
+            <Button asChild>
+              <Link href={`/projects/${projectId}/cost-control/commitments/new`}>
+                <Plus className="w-4 h-4 mr-2" /> Add Commitment
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
       <DataTable columns={columns} data={data ?? []} total={data?.length ?? 0} emptyMessage="No commitments yet." />

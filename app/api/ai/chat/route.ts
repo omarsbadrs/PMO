@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { generateEmbedding } from '@/lib/ai/embeddings'
 import { retrieveChunks } from '@/lib/ai/retrieval'
+import { getStructuredContext } from '@/lib/ai/db-query'
 import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -41,32 +42,30 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
   const { data: project } = await admin.from('projects').select('name').eq('id', projectId).single()
 
-  // Generate embedding for the query
-  const queryEmbedding = await generateEmbedding(message)
-
-  // Retrieve relevant chunks
+  // Retrieve document chunks and structured DB data in parallel
+  const [queryEmbedding, dbContext] = await Promise.all([
+    generateEmbedding(message),
+    getStructuredContext(message, projectId, moduleKey),
+  ])
   const chunks = await retrieveChunks(queryEmbedding, projectId, moduleKey)
 
-  // Build context from chunks
   const documentContext = chunks.length > 0
     ? chunks.map((c) => {
         const page = c.metadata_json?.pageNumber ?? c.chunk_index + 1
         return `[doc: ${c.file_name}, p.${page}]\n${c.content_text}`
       }).join('\n\n---\n\n')
-    : 'No relevant documents found for this query.'
+    : ''
 
+  const hasContext = documentContext || dbContext
   const systemPrompt = `You are a PMO assistant for project "${project?.name ?? projectId}".
-${moduleKey ? `Current module scope: ${moduleKey.replace('_', ' ')}.` : ''}
+${moduleKey ? `Current module scope: ${moduleKey.replace(/_/g, ' ')}.` : ''}
 
-RELEVANT DOCUMENT CONTEXT:
-${documentContext}
-
-Instructions:
-- Answer using only the provided context above.
-- Cite document sources as: [doc: filename, p.PAGE]
-- If you cannot find relevant information in the context, say so clearly.
+${dbContext ? `DATABASE RECORDS:\n${dbContext}\n\n` : ''}${documentContext ? `DOCUMENT CONTEXT:\n${documentContext}\n\n` : ''}${!hasContext ? 'No relevant data or documents found for this query.\n\n' : ''}Instructions:
+- Answer based on the DATABASE RECORDS and DOCUMENT CONTEXT provided above.
+- Cite database sources as: [data: table name], document sources as: [doc: filename, p.PAGE]
+- If no context was provided, clearly state that no data was found and suggest the user add data or upload documents.
 - Be concise and professional.
-- Format numbers and dates clearly.`
+- Format currency and dates clearly.`
 
   // Stream response from Claude
   const stream = anthropic.messages.stream({

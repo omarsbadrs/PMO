@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import DataTable, { Column } from '@/components/shared/DataTable'
+import CsvImportButton from '@/components/shared/CsvImportButton'
 import type { CcForecast } from '@/types/app'
 import { Plus } from 'lucide-react'
 
@@ -15,18 +16,20 @@ const columns: Column<CcForecast>[] = [
   { key: 'notes', header: 'Notes', className: 'text-gray-500 text-sm' },
 ]
 
+const importColumns = [
+  { key: 'period', label: 'Period', required: true },
+  { key: 'eac', label: 'EAC' },
+  { key: 'etc', label: 'ETC' },
+  { key: 'notes', label: 'Notes' },
+]
+
 export default async function ForecastsPage({ params }: Props) {
   const { projectId } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data } = await supabase
-    .from('cc_forecasts')
-    .select('*')
-    .eq('project_id', projectId)
-    .order('period', { ascending: false })
-
+  const { data } = await supabase.from('cc_forecasts').select('*').eq('project_id', projectId).order('period', { ascending: false })
   const base = `/projects/${projectId}/cost-control`
 
   return (
@@ -36,18 +39,14 @@ export default async function ForecastsPage({ params }: Props) {
           <h1 className="text-xl font-bold">Forecasts</h1>
           <p className="text-sm text-gray-500">EAC and ETC by period</p>
         </div>
-        <Button asChild>
-          <Link href={`${base}/forecasts/new`}>
-            <Plus className="size-4 mr-2" />New Forecast
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <CsvImportButton table="cc_forecasts" projectId={projectId} importColumns={importColumns} />
+          <Button asChild>
+            <Link href={`${base}/forecasts/new`}><Plus className="size-4 mr-2" />New Forecast</Link>
+          </Button>
+        </div>
       </div>
-      <DataTable
-        columns={columns}
-        data={(data ?? []) as CcForecast[]}
-        total={data?.length ?? 0}
-        emptyMessage="No forecasts recorded yet."
-      />
+      <DataTable columns={columns} data={(data ?? []) as CcForecast[]} total={data?.length ?? 0} emptyMessage="No forecasts recorded yet." />
     </div>
   )
 }

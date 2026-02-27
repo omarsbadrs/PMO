@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import DataTable, { Column } from '@/components/shared/DataTable'
+import CsvImportButton from '@/components/shared/CsvImportButton'
 import type { PlActivity } from '@/types/app'
 import { getUserModuleRole } from '@/lib/auth/helpers'
 
@@ -19,6 +20,19 @@ const columns: Column<PlActivity>[] = [
   { key: 'status', header: 'Status', type: 'status', className: 'w-28' },
 ]
 
+const importColumns = [
+  { key: 'activity_id', label: 'Activity ID' },
+  { key: 'name', label: 'Activity Name', required: true },
+  { key: 'wbs', label: 'WBS' },
+  { key: 'planned_start', label: 'Planned Start' },
+  { key: 'planned_finish', label: 'Planned Finish' },
+  { key: 'actual_start', label: 'Actual Start' },
+  { key: 'actual_finish', label: 'Actual Finish' },
+  { key: 'duration_days', label: 'Duration (days)' },
+  { key: 'percent_complete', label: '% Complete' },
+  { key: 'status', label: 'Status' },
+]
+
 export default async function ActivitiesPage({ params }: Props) {
   const { projectId } = await params
   const supabase = await createClient()
@@ -32,7 +46,12 @@ export default async function ActivitiesPage({ params }: Props) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div><h1 className="text-xl font-bold">Activities</h1><p className="text-sm text-gray-500">Schedule activities and progress</p></div>
-        {canWrite && <Button asChild><Link href={`/projects/${projectId}/planning/activities/new`}><Plus className="w-4 h-4 mr-2" />Add Activity</Link></Button>}
+        {canWrite && (
+          <div className="flex gap-2">
+            <CsvImportButton table="pl_activities" projectId={projectId} importColumns={importColumns} />
+            <Button asChild><Link href={`/projects/${projectId}/planning/activities/new`}><Plus className="w-4 h-4 mr-2" />Add Activity</Link></Button>
+          </div>
+        )}
       </div>
       <DataTable columns={columns} data={data ?? []} total={data?.length ?? 0} emptyMessage="No activities yet." />
     </div>
