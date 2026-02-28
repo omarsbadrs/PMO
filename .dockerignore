@@ -1,0 +1,10 @@
+.git
+.gitignore
+.env*
+!.env.example
+node_modules
+.next
+.vercel
+README.md
+*.md
+.claude
