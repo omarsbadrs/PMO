@@ -20,9 +20,10 @@ const modules = [
 interface AppSidebarProps {
   projectId: string | null
   isGlobalAdmin: boolean
+  allowedModules?: string[] | null  // null = show all; array = filter to these slugs
 }
 
-export default function AppSidebar({ projectId, isGlobalAdmin }: AppSidebarProps) {
+export default function AppSidebar({ projectId, isGlobalAdmin, allowedModules = null }: AppSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -54,18 +55,20 @@ export default function AppSidebar({ projectId, isGlobalAdmin }: AppSidebarProps
             <div className="pt-4 pb-1 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
               Modules
             </div>
-            {modules.map(({ key, label, icon: Icon }) => {
-              const href = `${projectBase}/${key}`
-              return (
-                <SidebarLink
-                  key={key}
-                  href={href}
-                  icon={Icon}
-                  label={label}
-                  active={pathname.startsWith(href)}
-                />
-              )
-            })}
+            {modules
+              .filter(({ key }) => allowedModules === null || allowedModules.includes(key))
+              .map(({ key, label, icon: Icon }) => {
+                const href = `${projectBase}/${key}`
+                return (
+                  <SidebarLink
+                    key={key}
+                    href={href}
+                    icon={Icon}
+                    label={label}
+                    active={pathname.startsWith(href)}
+                  />
+                )
+              })}
 
             <div className="pt-4 pb-1 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
               Project

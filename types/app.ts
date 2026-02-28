@@ -1,4 +1,5 @@
 export type UserRole = 'GLOBAL_ADMIN' | 'MODULE_ADMIN' | 'INPUT' | 'VIEWER'
+export type AppRole = 'admin' | 'manager' | 'user'
 export type ModuleKey = 'cost_control' | 'planning' | 'safety' | 'quality'
 export type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived'
 export type ActionStatus = 'open' | 'in_progress' | 'closed' | 'cancelled'
@@ -12,6 +13,11 @@ export interface UserProfile {
   email: string
   avatar_url: string | null
   is_global_admin: boolean
+  role: AppRole
+  department: string | null
+  job_title: string | null
+  tier: string | null
+  is_active: boolean
   created_at: string
   updated_at: string
 }

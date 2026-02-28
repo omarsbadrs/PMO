@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,11 +22,15 @@ export default async function ProjectsPage() {
 
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('is_global_admin')
+    .select('is_global_admin, role')
     .eq('id', user.id)
     .single()
 
-  const { data: projects } = await supabase
+  // Admins and managers see all projects (bypass RLS); regular users rely on RLS + project_memberships
+  const isElevated = profile?.is_global_admin || profile?.role === 'admin' || profile?.role === 'manager'
+  const projectClient = isElevated ? createAdminClient() : supabase
+
+  const { data: projects } = await projectClient
     .from('projects')
     .select('*')
     .order('created_at', { ascending: false })
@@ -61,7 +66,7 @@ export default async function ProjectsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {projects.map((project: Project) => (
-            <Link key={project.id} href={`/projects/${project.id}/cost-control`}>
+            <Link key={project.id} href={`/projects/${project.id}`}>
               <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">

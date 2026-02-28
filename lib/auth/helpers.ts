@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { UserProfile } from '@/types/app'
 
 export async function getUser() {
@@ -51,16 +52,23 @@ export async function getUserModuleRole(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  // Check global admin first
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('is_global_admin')
+    .select('is_global_admin, role, is_active')
     .eq('id', user.id)
     .single()
 
-  if (profile?.is_global_admin) return 'GLOBAL_ADMIN'
+  // Disabled users have no access
+  if (profile?.is_active === false) return null
 
-  const { data: role } = await supabase
+  // Admin and Manager have full access to all modules
+  if (profile?.is_global_admin || profile?.role === 'admin' || profile?.role === 'manager') {
+    return 'GLOBAL_ADMIN'
+  }
+
+  // Regular users: check assigned module roles (use admin client to bypass any RLS issues)
+  const admin = createAdminClient()
+  const { data: role } = await admin
     .from('module_roles')
     .select('role')
     .eq('user_id', user.id)

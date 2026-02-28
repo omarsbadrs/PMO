@@ -17,6 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .single()
 
   if (!profile) redirect('/login')
+  if (profile.is_active === false) redirect('/login')
 
   return (
     <div className="flex min-h-screen bg-gray-50">
