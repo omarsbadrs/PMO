@@ -1,13 +1,22 @@
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import AppSidebar from '@/components/layout/AppSidebar'
 import Header from '@/components/layout/Header'
 import type { UserProfile } from '@/types/app'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const headersList = await headers()
+  const pathname = headersList.get('x-pathname') ?? ''
+
+  // Project detail pages have their own full shell in [projectId]/layout.tsx.
+  // Passthrough here avoids duplicate auth, profile, and sidebar rendering.
+  if (/^\/projects\/[^/]+/.test(pathname)) {
+    return <>{children}</>
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase
@@ -23,7 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="flex min-h-screen bg-gray-50">
       <AppSidebar
         projectId={null}
-        isGlobalAdmin={profile.is_global_admin}
+        isGlobalAdmin={profile.is_global_admin || profile.role === 'admin'}
       />
       <div className="flex-1 flex flex-col min-w-0">
         <Header user={profile as UserProfile} />
