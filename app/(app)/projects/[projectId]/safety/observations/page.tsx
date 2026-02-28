@@ -68,7 +68,7 @@ export default async function ObservationsPage({ params, searchParams }: Props) 
           </div>
         )}
       </div>
-      <DataTable columns={columns} data={data ?? []} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No observations recorded." />
+      <DataTable columns={columns} data={(data ?? []) as SfObservation[]} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No observations recorded." />
     </div>
   )
 }

@@ -75,7 +75,7 @@ export default async function CommitmentsPage({ params, searchParams }: Props) {
           </div>
         )}
       </div>
-      <DataTable columns={columns} data={data ?? []} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No commitments yet." />
+      <DataTable columns={columns} data={(data ?? []) as CcCommitment[]} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No commitments yet." />
     </div>
   )
 }

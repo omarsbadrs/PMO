@@ -66,7 +66,7 @@ export default async function ActualsPage({ params, searchParams }: Props) {
           </div>
         )}
       </div>
-      <DataTable columns={columns} data={data ?? []} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No actual costs recorded." />
+      <DataTable columns={columns} data={(data ?? []) as CcActual[]} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No actual costs recorded." />
     </div>
   )
 }

@@ -71,7 +71,7 @@ export default async function NcrPage({ params, searchParams }: Props) {
           </div>
         )}
       </div>
-      <DataTable columns={columns} data={data ?? []} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No NCRs raised." />
+      <DataTable columns={columns} data={(data ?? []) as QlNcr[]} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No NCRs raised." />
     </div>
   )
 }

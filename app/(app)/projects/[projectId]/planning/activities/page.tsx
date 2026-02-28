@@ -72,7 +72,7 @@ export default async function ActivitiesPage({ params, searchParams }: Props) {
           </div>
         )}
       </div>
-      <DataTable columns={columns} data={data ?? []} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No activities yet." />
+      <DataTable columns={columns} data={(data ?? []) as PlActivity[]} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No activities yet." />
     </div>
   )
 }

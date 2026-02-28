@@ -79,7 +79,7 @@ export default async function BudgetPage({ params, searchParams }: Props) {
 
       <DataTable
         columns={columns}
-        data={budgets ?? []}
+        data={(budgets ?? []) as CcBudget[]}
         total={count ?? 0}
         pageSize={PAGE_SIZE}
         emptyMessage="No budget items yet."

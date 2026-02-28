@@ -69,7 +69,7 @@ export default async function ChangesPage({ params, searchParams }: Props) {
           </div>
         )}
       </div>
-      <DataTable columns={columns} data={data ?? []} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No change orders yet." />
+      <DataTable columns={columns} data={(data ?? []) as CcChange[]} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No change orders yet." />
     </div>
   )
 }

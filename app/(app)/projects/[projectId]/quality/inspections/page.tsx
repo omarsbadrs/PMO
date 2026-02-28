@@ -68,7 +68,7 @@ export default async function InspectionsPage({ params, searchParams }: Props) {
           </div>
         )}
       </div>
-      <DataTable columns={columns} data={data ?? []} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No inspections recorded." />
+      <DataTable columns={columns} data={(data ?? []) as QlInspection[]} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No inspections recorded." />
     </div>
   )
 }

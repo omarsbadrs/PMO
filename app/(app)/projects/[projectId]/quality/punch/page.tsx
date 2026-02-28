@@ -69,7 +69,7 @@ export default async function PunchPage({ params, searchParams }: Props) {
           </div>
         )}
       </div>
-      <DataTable columns={columns} data={data ?? []} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No punch items." />
+      <DataTable columns={columns} data={(data ?? []) as QlPunch[]} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No punch items." />
     </div>
   )
 }

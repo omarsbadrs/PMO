@@ -65,7 +65,7 @@ export default async function MilestonesPage({ params, searchParams }: Props) {
           </div>
         )}
       </div>
-      <DataTable columns={columns} data={data ?? []} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No milestones defined." />
+      <DataTable columns={columns} data={(data ?? []) as PlMilestone[]} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No milestones defined." />
     </div>
   )
 }

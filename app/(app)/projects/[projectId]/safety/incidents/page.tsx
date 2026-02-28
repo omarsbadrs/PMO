@@ -69,7 +69,7 @@ export default async function IncidentsPage({ params, searchParams }: Props) {
           </div>
         )}
       </div>
-      <DataTable columns={columns} data={data ?? []} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No incidents recorded." />
+      <DataTable columns={columns} data={(data ?? []) as SfIncident[]} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No incidents recorded." />
     </div>
   )
 }
