@@ -7,6 +7,8 @@ import DataTable, { Column } from '@/components/shared/DataTable'
 import CsvImportButton from '@/components/shared/CsvImportButton'
 import { getUserModuleRole } from '@/lib/auth/helpers'
 
+const PAGE_SIZE = 50
+
 interface Schedule {
   id: string
   name: string
@@ -37,10 +39,18 @@ const importColumns = [
   { key: 'notes', label: 'Notes' },
 ]
 
-interface Props { params: Promise<{ projectId: string }> }
+interface Props {
+  params: Promise<{ projectId: string }>
+  searchParams: Promise<{ page?: string }>
+}
 
-export default async function SchedulesPage({ params }: Props) {
+export default async function SchedulesPage({ params, searchParams }: Props) {
   const { projectId } = await params
+  const { page: pageStr } = await searchParams
+  const page = Math.max(1, Number(pageStr ?? '1'))
+  const from = (page - 1) * PAGE_SIZE
+  const to = from + PAGE_SIZE - 1
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -48,11 +58,12 @@ export default async function SchedulesPage({ params }: Props) {
   const role = await getUserModuleRole(projectId, 'planning')
   if (!role) redirect('/projects')
 
-  const { data } = await supabase
+  const { data, count } = await supabase
     .from('pl_schedules')
-    .select('*')
+    .select('id, name, type, revision_number, baseline_date, data_date, status', { count: 'exact' })
     .eq('project_id', projectId)
     .order('created_at', { ascending: false })
+    .range(from, to)
 
   const canWrite = ['GLOBAL_ADMIN', 'MODULE_ADMIN', 'INPUT'].includes(role)
 
@@ -74,7 +85,7 @@ export default async function SchedulesPage({ params }: Props) {
           </div>
         )}
       </div>
-      <DataTable columns={columns} data={data ?? []} total={data?.length ?? 0} emptyMessage="No schedules defined." />
+      <DataTable columns={columns} data={data ?? []} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No schedules defined." />
     </div>
   )
 }

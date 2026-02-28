@@ -8,7 +8,12 @@ import CsvImportButton from '@/components/shared/CsvImportButton'
 import type { CcBudget } from '@/types/app'
 import { getUserModuleRole } from '@/lib/auth/helpers'
 
-interface Props { params: Promise<{ projectId: string }> }
+const PAGE_SIZE = 50
+
+interface Props {
+  params: Promise<{ projectId: string }>
+  searchParams: Promise<{ page?: string }>
+}
 
 const columns: Column<CcBudget>[] = [
   { key: 'code', header: 'Code', className: 'w-24 font-mono text-sm' },
@@ -30,8 +35,13 @@ const importColumns = [
   { key: 'notes', label: 'Notes' },
 ]
 
-export default async function BudgetPage({ params }: Props) {
+export default async function BudgetPage({ params, searchParams }: Props) {
   const { projectId } = await params
+  const { page: pageStr } = await searchParams
+  const page = Math.max(1, Number(pageStr ?? '1'))
+  const from = (page - 1) * PAGE_SIZE
+  const to = from + PAGE_SIZE - 1
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -39,11 +49,12 @@ export default async function BudgetPage({ params }: Props) {
   const role = await getUserModuleRole(projectId, 'cost_control')
   if (!role) redirect('/projects')
 
-  const { data: budgets } = await supabase
+  const { data: budgets, count } = await supabase
     .from('cc_budget')
-    .select('*')
+    .select('id, code, description, discipline, baseline_amount, approved_amount, status', { count: 'exact' })
     .eq('project_id', projectId)
     .order('code', { ascending: true })
+    .range(from, to)
 
   const canWrite = ['GLOBAL_ADMIN', 'MODULE_ADMIN', 'INPUT'].includes(role)
 
@@ -69,7 +80,8 @@ export default async function BudgetPage({ params }: Props) {
       <DataTable
         columns={columns}
         data={budgets ?? []}
-        total={budgets?.length ?? 0}
+        total={count ?? 0}
+        pageSize={PAGE_SIZE}
         emptyMessage="No budget items yet."
       />
     </div>

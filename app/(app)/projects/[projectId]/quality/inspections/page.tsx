@@ -8,7 +8,12 @@ import CsvImportButton from '@/components/shared/CsvImportButton'
 import type { QlInspection } from '@/types/app'
 import { getUserModuleRole } from '@/lib/auth/helpers'
 
-interface Props { params: Promise<{ projectId: string }> }
+const PAGE_SIZE = 50
+
+interface Props {
+  params: Promise<{ projectId: string }>
+  searchParams: Promise<{ page?: string }>
+}
 
 const columns: Column<QlInspection>[] = [
   { key: 'inspection_number', header: '#', className: 'w-28 font-mono text-sm' },
@@ -30,15 +35,28 @@ const importColumns = [
   { key: 'notes', label: 'Notes' },
 ]
 
-export default async function InspectionsPage({ params }: Props) {
+export default async function InspectionsPage({ params, searchParams }: Props) {
   const { projectId } = await params
+  const { page: pageStr } = await searchParams
+  const page = Math.max(1, Number(pageStr ?? '1'))
+  const from = (page - 1) * PAGE_SIZE
+  const to = from + PAGE_SIZE - 1
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
   const role = await getUserModuleRole(projectId, 'quality')
   if (!role) redirect('/projects')
-  const { data } = await supabase.from('ql_inspections').select('*').eq('project_id', projectId).order('inspection_date', { ascending: false })
+
+  const { data, count } = await supabase
+    .from('ql_inspections')
+    .select('id, inspection_number, title, type, inspection_date, result, status', { count: 'exact' })
+    .eq('project_id', projectId)
+    .order('inspection_date', { ascending: false })
+    .range(from, to)
+
   const canWrite = ['GLOBAL_ADMIN', 'MODULE_ADMIN', 'INPUT'].includes(role)
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -50,7 +68,7 @@ export default async function InspectionsPage({ params }: Props) {
           </div>
         )}
       </div>
-      <DataTable columns={columns} data={data ?? []} total={data?.length ?? 0} emptyMessage="No inspections recorded." />
+      <DataTable columns={columns} data={data ?? []} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No inspections recorded." />
     </div>
   )
 }

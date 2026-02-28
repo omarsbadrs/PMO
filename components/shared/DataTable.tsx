@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils/format'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 
 // Built-in column type renderers — serializable, no functions needed
 export type ColumnType =
@@ -38,10 +39,8 @@ interface DataTableProps<T extends { id: string }> {
   data: T[]
   onRowClick?: (row: T) => void
   emptyMessage?: string
-  page?: number
-  pageSize?: number
-  total?: number
-  onPageChange?: (page: number) => void
+  total?: number       // total row count from DB (enables server-side pagination)
+  pageSize?: number    // rows per page, default 50
 }
 
 export function StatusBadge({ status }: { status: string }) {
@@ -152,9 +151,20 @@ function renderBuiltIn(col: Column<Record<string, unknown>>, row: Record<string,
 
 export default function DataTable<T extends { id: string }>({
   columns, data, onRowClick, emptyMessage = 'No records found.',
-  page = 1, pageSize = 20, total = 0, onPageChange,
+  total = 0, pageSize = 50,
 }: DataTableProps<T>) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+
+  const page = Math.max(1, Number(searchParams.get('page') ?? '1'))
   const totalPages = Math.ceil(total / pageSize)
+
+  function goToPage(p: number) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('page', String(p))
+    router.push(`${pathname}?${params.toString()}`)
+  }
 
   return (
     <div className="space-y-2">
@@ -203,11 +213,11 @@ export default function DataTable<T extends { id: string }>({
         <div className="flex items-center justify-between text-sm text-gray-500 px-1">
           <span>{total} total records</span>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange?.(page - 1)}>
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => goToPage(page - 1)}>
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <span>Page {page} of {totalPages}</span>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onPageChange?.(page + 1)}>
+            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => goToPage(page + 1)}>
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>

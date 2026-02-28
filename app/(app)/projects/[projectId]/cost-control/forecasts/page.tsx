@@ -8,7 +8,12 @@ import type { CcForecast } from '@/types/app'
 import { Plus } from 'lucide-react'
 import { getUserModuleRole } from '@/lib/auth/helpers'
 
-interface Props { params: Promise<{ projectId: string }> }
+const PAGE_SIZE = 50
+
+interface Props {
+  params: Promise<{ projectId: string }>
+  searchParams: Promise<{ page?: string }>
+}
 
 const columns: Column<CcForecast>[] = [
   { key: 'period', header: 'Period', type: 'date' },
@@ -24,8 +29,13 @@ const importColumns = [
   { key: 'notes', label: 'Notes' },
 ]
 
-export default async function ForecastsPage({ params }: Props) {
+export default async function ForecastsPage({ params, searchParams }: Props) {
   const { projectId } = await params
+  const { page: pageStr } = await searchParams
+  const page = Math.max(1, Number(pageStr ?? '1'))
+  const from = (page - 1) * PAGE_SIZE
+  const to = from + PAGE_SIZE - 1
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -35,7 +45,13 @@ export default async function ForecastsPage({ params }: Props) {
 
   const canWrite = ['GLOBAL_ADMIN', 'MODULE_ADMIN', 'INPUT'].includes(role)
 
-  const { data } = await supabase.from('cc_forecasts').select('*').eq('project_id', projectId).order('period', { ascending: false })
+  const { data, count } = await supabase
+    .from('cc_forecasts')
+    .select('id, period, eac, etc, notes', { count: 'exact' })
+    .eq('project_id', projectId)
+    .order('period', { ascending: false })
+    .range(from, to)
+
   const base = `/projects/${projectId}/cost-control`
 
   return (
@@ -54,7 +70,7 @@ export default async function ForecastsPage({ params }: Props) {
           </div>
         )}
       </div>
-      <DataTable columns={columns} data={(data ?? []) as CcForecast[]} total={data?.length ?? 0} emptyMessage="No forecasts recorded yet." />
+      <DataTable columns={columns} data={(data ?? []) as CcForecast[]} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No forecasts recorded yet." />
     </div>
   )
 }

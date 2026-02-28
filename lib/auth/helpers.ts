@@ -51,6 +51,19 @@ export async function requireGlobalAdmin() {
   return user
 }
 
+// Private cached helper — deduplicates module_roles DB lookups within a single request
+const getModuleRoleFromDb = cache(async (userId: string, projectId: string, moduleKey: string) => {
+  const admin = createAdminClient()
+  const { data: role } = await admin
+    .from('module_roles')
+    .select('role')
+    .eq('user_id', userId)
+    .eq('project_id', projectId)
+    .eq('module_key', moduleKey)
+    .single()
+  return role?.role ?? null
+})
+
 export async function getUserModuleRole(
   projectId: string,
   moduleKey: string
@@ -69,15 +82,6 @@ export async function getUserModuleRole(
     return 'GLOBAL_ADMIN'
   }
 
-  // Regular users: check assigned module roles
-  const admin = createAdminClient()
-  const { data: role } = await admin
-    .from('module_roles')
-    .select('role')
-    .eq('user_id', user.id)
-    .eq('project_id', projectId)
-    .eq('module_key', moduleKey)
-    .single()
-
-  return role?.role ?? null
+  // Regular users: cached DB lookup — safe to call from multiple pages in same request
+  return getModuleRoleFromDb(user.id, projectId, moduleKey)
 }
