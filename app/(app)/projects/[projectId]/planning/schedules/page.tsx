@@ -17,7 +17,7 @@ interface Schedule {
   baseline_date: string | null
   data_date: string | null
   status: string | null
-  notes: string | null
+  notes?: string | null
 }
 
 const columns: Column<Schedule>[] = [
