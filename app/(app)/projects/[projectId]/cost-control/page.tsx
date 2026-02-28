@@ -39,6 +39,7 @@ export default async function CostControlDashboard({ params }: Props) {
     { href: `${base}/budget`, label: 'Budget' },
     { href: `${base}/commitments`, label: 'Commitments' },
     { href: `${base}/actuals`, label: 'Actual Costs' },
+    { href: `${base}/forecasts`, label: 'Forecasts' },
     { href: `${base}/changes`, label: 'Changes' },
     { href: `${base}/documents`, label: 'Documents' },
   ]

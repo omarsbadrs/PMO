@@ -6,6 +6,7 @@ import DataTable, { Column } from '@/components/shared/DataTable'
 import CsvImportButton from '@/components/shared/CsvImportButton'
 import type { CcForecast } from '@/types/app'
 import { Plus } from 'lucide-react'
+import { getUserModuleRole } from '@/lib/auth/helpers'
 
 interface Props { params: Promise<{ projectId: string }> }
 
@@ -29,6 +30,11 @@ export default async function ForecastsPage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const role = await getUserModuleRole(projectId, 'cost_control')
+  if (!role) redirect('/projects')
+
+  const canWrite = ['GLOBAL_ADMIN', 'MODULE_ADMIN', 'INPUT'].includes(role)
+
   const { data } = await supabase.from('cc_forecasts').select('*').eq('project_id', projectId).order('period', { ascending: false })
   const base = `/projects/${projectId}/cost-control`
 
@@ -39,12 +45,14 @@ export default async function ForecastsPage({ params }: Props) {
           <h1 className="text-xl font-bold">Forecasts</h1>
           <p className="text-sm text-gray-500">EAC and ETC by period</p>
         </div>
-        <div className="flex gap-2">
-          <CsvImportButton table="cc_forecasts" projectId={projectId} importColumns={importColumns} />
-          <Button asChild>
-            <Link href={`${base}/forecasts/new`}><Plus className="size-4 mr-2" />New Forecast</Link>
-          </Button>
-        </div>
+        {canWrite && (
+          <div className="flex gap-2">
+            <CsvImportButton table="cc_forecasts" projectId={projectId} importColumns={importColumns} />
+            <Button asChild>
+              <Link href={`${base}/forecasts/new`}><Plus className="size-4 mr-2" />New Forecast</Link>
+            </Button>
+          </div>
+        )}
       </div>
       <DataTable columns={columns} data={(data ?? []) as CcForecast[]} total={data?.length ?? 0} emptyMessage="No forecasts recorded yet." />
     </div>
