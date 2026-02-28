@@ -1,6 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect, notFound } from 'next/navigation'
+import { getUser, getUserProfile } from '@/lib/auth/helpers'
 import AppSidebar from '@/components/layout/AppSidebar'
 import Header from '@/components/layout/Header'
 import type { UserProfile } from '@/types/app'
@@ -20,36 +20,38 @@ interface Props {
 
 export default async function ProjectLayout({ children, params }: Props) {
   const { projectId } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
 
-  const [{ data: profile }, { data: project }] = await Promise.all([
-    supabase.from('user_profiles').select('*').eq('id', user.id).single(),
-    supabase.from('projects').select('*').eq('id', projectId).single(),
-  ])
+  // Both use cache() — zero extra DB calls if already fetched this request
+  const user    = await getUser()
+  const profile = await getUserProfile()
 
-  if (!profile) redirect('/login')
+  if (!user || !profile) redirect('/login')
   if (profile.is_active === false) redirect('/login')
-  if (!project) notFound()
 
   const isElevated =
     profile.is_global_admin ||
     profile.role === 'admin' ||
     profile.role === 'manager'
 
-  // Elevated users see all modules; regular users see only their assigned ones
-  let allowedModules: string[] | null = null  // null = all
-  if (!isElevated) {
-    const admin = createAdminClient()
-    const { data: moduleRoles } = await admin
-      .from('module_roles')
-      .select('module_key')
-      .eq('user_id', user.id)
-      .eq('project_id', projectId)
+  const admin = createAdminClient()
 
-    allowedModules = (moduleRoles ?? []).map((r) => DB_TO_SLUG[r.module_key] ?? r.module_key)
-  }
+  // Fetch project + (for regular users) allowed module keys in parallel
+  const [{ data: project }, moduleRolesResult] = await Promise.all([
+    admin.from('projects').select('id, name, code').eq('id', projectId).single(),
+    isElevated
+      ? Promise.resolve({ data: null })
+      : admin
+          .from('module_roles')
+          .select('module_key')
+          .eq('user_id', user.id)
+          .eq('project_id', projectId),
+  ])
+
+  if (!project) notFound()
+
+  const allowedModules: string[] | null = isElevated
+    ? null
+    : (moduleRolesResult.data ?? []).map((r) => DB_TO_SLUG[r.module_key] ?? r.module_key)
 
   return (
     <div className="flex min-h-screen bg-gray-50">

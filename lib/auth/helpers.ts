@@ -8,9 +8,12 @@ import type { UserProfile } from '@/types/app'
 // All layouts and pages that call these functions share the same result.
 
 const getSessionUser = cache(async () => {
+  // getSession() reads the JWT from the cookie — no network call.
+  // proxy.ts already verified the JWT with getUser() on every request,
+  // so reading the session here is safe and free.
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  return user ?? null
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.user ?? null
 })
 
 const getSessionProfile = cache(async (userId: string) => {

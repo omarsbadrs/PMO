@@ -1,6 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
+import { getUser, getUserProfile } from '@/lib/auth/helpers'
 
 const MODULE_ORDER = ['cost-control', 'planning', 'safety', 'quality']
 const DB_TO_SLUG: Record<string, string> = {
@@ -14,26 +14,20 @@ interface Props { params: Promise<{ projectId: string }> }
 
 export default async function ProjectRoot({ params }: Props) {
   const { projectId } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('is_global_admin, role')
-    .eq('id', user.id)
-    .single()
+  const user    = await getUser()
+  const profile = await getUserProfile()
+  if (!user || !profile) redirect('/login')
 
   const isElevated =
-    profile?.is_global_admin ||
-    profile?.role === 'admin' ||
-    profile?.role === 'manager'
+    profile.is_global_admin ||
+    profile.role === 'admin' ||
+    profile.role === 'manager'
 
   if (isElevated) {
     redirect(`/projects/${projectId}/cost-control`)
   }
 
-  // Regular user — redirect to their first assigned module
   const admin = createAdminClient()
   const { data: moduleRoles } = await admin
     .from('module_roles')
@@ -44,10 +38,5 @@ export default async function ProjectRoot({ params }: Props) {
   const slugs = (moduleRoles ?? []).map((r) => DB_TO_SLUG[r.module_key] ?? r.module_key)
   const first = MODULE_ORDER.find((m) => slugs.includes(m))
 
-  if (first) {
-    redirect(`/projects/${projectId}/${first}`)
-  }
-
-  // No modules assigned — go back to projects list
-  redirect('/projects')
+  redirect(first ? `/projects/${projectId}/${first}` : '/projects')
 }
