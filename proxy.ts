@@ -40,6 +40,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/projects', request.url))
   }
 
+  // Expose pathname to server layouts (used by (app)/layout.tsx passthrough check)
+  supabaseResponse.headers.set('x-pathname', pathname)
+
   return supabaseResponse
 }
 
