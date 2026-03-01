@@ -22,12 +22,16 @@ export interface UserProfile {
   updated_at: string
 }
 
+export type ProjectCurrency = 'USD' | 'EUR' | 'SAR' | 'EGP' | 'GBP'
+
 export interface Project {
   id: string
   name: string
   code: string
   description: string | null
   status: ProjectStatus
+  currency: ProjectCurrency
+  usd_rate: number
   start_date: string | null
   end_date: string | null
   created_by: string | null
@@ -142,6 +146,7 @@ export interface CcCommitment {
   description: string
   amount: number | null
   currency: string
+  fx_rate: number
   status: string
   issue_date: string | null
   expiry_date: string | null
@@ -161,6 +166,8 @@ export interface CcActual {
   vendor: string | null
   description: string
   amount: number
+  document_currency: string
+  fx_rate: number
   cost_date: string | null
   status: string
   created_by: string | null

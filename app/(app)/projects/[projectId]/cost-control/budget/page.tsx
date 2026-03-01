@@ -15,14 +15,7 @@ interface Props {
   searchParams: Promise<{ page?: string }>
 }
 
-const columns: Column<CcBudget>[] = [
-  { key: 'code', header: 'Code', className: 'w-24 font-mono text-sm' },
-  { key: 'description', header: 'Description' },
-  { key: 'discipline', header: 'Discipline', className: 'w-32' },
-  { key: 'baseline_amount', header: 'Baseline', type: 'currency', className: 'text-right w-36' },
-  { key: 'approved_amount', header: 'Approved', type: 'currency', className: 'text-right w-36' },
-  { key: 'status', header: 'Status', type: 'status', className: 'w-28' },
-]
+
 
 const importColumns = [
   { key: 'code', label: 'Code' },
@@ -49,12 +42,26 @@ export default async function BudgetPage({ params, searchParams }: Props) {
   const role = await getUserModuleRole(projectId, 'cost_control')
   if (!role) redirect('/projects')
 
-  const { data: budgets, count } = await supabase
-    .from('cc_budget')
-    .select('id, code, description, discipline, baseline_amount, approved_amount, status', { count: 'exact' })
-    .eq('project_id', projectId)
-    .order('code', { ascending: true })
-    .range(from, to)
+  const [{ data: budgets, count }, { data: projectData }] = await Promise.all([
+    supabase
+      .from('cc_budget')
+      .select('id, code, description, discipline, baseline_amount, approved_amount, status', { count: 'exact' })
+      .eq('project_id', projectId)
+      .order('code', { ascending: true })
+      .range(from, to),
+    supabase.from('projects').select('currency').eq('id', projectId).single(),
+  ])
+
+  const projectCurrency = projectData?.currency ?? 'USD'
+
+  const columns: Column<CcBudget>[] = [
+    { key: 'code', header: 'Code', className: 'w-24 font-mono text-sm' },
+    { key: 'description', header: 'Description' },
+    { key: 'discipline', header: 'Discipline', className: 'w-32' },
+    { key: 'baseline_amount', header: 'Baseline', type: 'currency', currency: projectCurrency, className: 'text-right w-36' },
+    { key: 'approved_amount', header: 'Approved', type: 'currency', currency: projectCurrency, className: 'text-right w-36' },
+    { key: 'status', header: 'Status', type: 'status', className: 'w-28' },
+  ]
 
   const canWrite = ['GLOBAL_ADMIN', 'MODULE_ADMIN', 'INPUT'].includes(role)
 

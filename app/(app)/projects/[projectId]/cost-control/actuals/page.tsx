@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import DataTable, { Column } from '@/components/shared/DataTable'
 import CsvImportButton from '@/components/shared/CsvImportButton'
-import type { CcActual } from '@/types/app'
 import { getUserModuleRole } from '@/lib/auth/helpers'
 
 const PAGE_SIZE = 50
@@ -15,20 +14,26 @@ interface Props {
   searchParams: Promise<{ page?: string }>
 }
 
-const columns: Column<CcActual>[] = [
-  { key: 'invoice_number', header: 'Invoice #', className: 'w-32 font-mono text-sm' },
-  { key: 'vendor', header: 'Vendor', className: 'w-40' },
-  { key: 'description', header: 'Description' },
-  { key: 'amount', header: 'Amount', type: 'currency', className: 'text-right w-36' },
-  { key: 'cost_date', header: 'Date', type: 'date', className: 'w-32' },
-  { key: 'status', header: 'Status', type: 'status', className: 'w-28' },
-]
+type ActualRow = {
+  id: string
+  invoice_number: string | null
+  vendor: string | null
+  description: string
+  amount: number
+  document_currency: string
+  fx_rate: number
+  project_amount: number
+  cost_date: string | null
+  status: string
+}
 
 const importColumns = [
   { key: 'invoice_number', label: 'Invoice Number' },
   { key: 'vendor', label: 'Vendor' },
   { key: 'description', label: 'Description', required: true },
   { key: 'amount', label: 'Amount', required: true },
+  { key: 'document_currency', label: 'Document Currency' },
+  { key: 'fx_rate', label: 'FX Rate' },
   { key: 'cost_date', label: 'Cost Date' },
   { key: 'status', label: 'Status' },
 ]
@@ -46,12 +51,38 @@ export default async function ActualsPage({ params, searchParams }: Props) {
   const role = await getUserModuleRole(projectId, 'cost_control')
   if (!role) redirect('/projects')
 
-  const { data, count } = await supabase
-    .from('cc_actuals')
-    .select('id, invoice_number, vendor, description, amount, cost_date, status', { count: 'exact' })
-    .eq('project_id', projectId)
-    .order('cost_date', { ascending: false })
-    .range(from, to)
+  const [{ data, count }, { data: projectData }] = await Promise.all([
+    supabase
+      .from('cc_actuals')
+      .select('id, invoice_number, vendor, description, amount, document_currency, fx_rate, cost_date, status', { count: 'exact' })
+      .eq('project_id', projectId)
+      .order('cost_date', { ascending: false })
+      .range(from, to),
+    supabase.from('projects').select('currency').eq('id', projectId).single(),
+  ])
+
+  const projectCurrency = projectData?.currency ?? 'USD'
+
+  const rows: ActualRow[] = (data ?? []).map((r) => ({
+    ...r,
+    document_currency: r.document_currency ?? 'USD',
+    fx_rate: r.fx_rate ?? 1,
+    project_amount: (r.amount ?? 0) * (r.fx_rate ?? 1),
+  }))
+
+  const projectHeader = 'Project (' + projectCurrency + ')'
+
+  const columns: Column<ActualRow>[] = [
+    { key: 'invoice_number', header: 'Invoice #', className: 'w-32 font-mono text-sm' },
+    { key: 'vendor', header: 'Vendor', className: 'w-36' },
+    { key: 'description', header: 'Description' },
+    { key: 'amount', header: 'Doc Amount', type: 'currency', currencyKey: 'document_currency', className: 'text-right w-32' },
+    { key: 'document_currency', header: 'Doc Currency', className: 'w-24 text-center font-mono text-sm' },
+    { key: 'fx_rate', header: 'FX Rate', className: 'text-right w-24' },
+    { key: 'project_amount', header: projectHeader, type: 'currency', currency: projectCurrency, className: 'text-right w-36 font-medium' },
+    { key: 'cost_date', header: 'Date', type: 'date', className: 'w-28' },
+    { key: 'status', header: 'Status', type: 'status', className: 'w-24' },
+  ]
 
   const canWrite = ['GLOBAL_ADMIN', 'MODULE_ADMIN', 'INPUT'].includes(role)
 
@@ -66,7 +97,7 @@ export default async function ActualsPage({ params, searchParams }: Props) {
           </div>
         )}
       </div>
-      <DataTable columns={columns} data={(data ?? []) as CcActual[]} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No actual costs recorded." />
+      <DataTable columns={columns} data={rows} total={count ?? 0} pageSize={PAGE_SIZE} emptyMessage="No actual costs recorded." />
     </div>
   )
 }

@@ -76,10 +76,12 @@ export default function UserDetailClient({ userId, currentRole, isActive, projec
   }
 
   async function handleModuleToggle(projectId: string, moduleKey: string, checked: boolean) {
-    const current = new Set(assignments[projectId] ?? [])
+    const previous = new Set(assignments[projectId] ?? [])
+    const current = new Set(previous)
     if (checked) current.add(moduleKey)
     else current.delete(moduleKey)
 
+    // Optimistic update
     setAssignments((prev) => ({ ...prev, [projectId]: current }))
 
     const res = await fetch(`/api/admin/users/${userId}/modules`, {
@@ -87,7 +89,14 @@ export default function UserDetailClient({ userId, currentRole, isActive, projec
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ projectId, modules: Array.from(current) }),
     })
-    if (!res.ok) toast.error('Failed to update module access')
+
+    if (!res.ok) {
+      // Revert optimistic update on failure
+      setAssignments((prev) => ({ ...prev, [projectId]: previous }))
+      toast.error('Failed to update module access')
+    } else {
+      toast.success(checked ? 'Module access granted' : 'Module access removed')
+    }
   }
 
   const roleLabels: Record<AppRole, string> = { admin: 'Admin', manager: 'Manager', user: 'User' }

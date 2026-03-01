@@ -29,8 +29,10 @@ export interface Column<T> {
   render?: (row: T) => React.ReactNode
   /** Use type instead of render when the parent is a Server Component */
   type?: ColumnType
-  /** For type:'currency' — key of the currency field (e.g. 'currency') */
+  /** For type:'currency' — key of the per-row currency field (e.g. 'currency') */
   currencyKey?: string
+  /** For type:'currency' — fixed currency for all rows (e.g. project currency); overridden by currencyKey */
+  currency?: string
   className?: string
 }
 
@@ -106,7 +108,7 @@ function renderBuiltIn(col: Column<Record<string, unknown>>, row: Record<string,
       return <StatusBadge status={String(val ?? '')} />
 
     case 'currency': {
-      const currency = col.currencyKey ? String(row[col.currencyKey] ?? 'USD') : 'USD'
+      const currency = col.currencyKey ? String(row[col.currencyKey] ?? col.currency ?? 'USD') : (col.currency ?? 'USD')
       return formatCurrency(val as number, currency)
     }
 

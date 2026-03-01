@@ -14,6 +14,14 @@ import Link from 'next/link'
 
 interface Props { params: Promise<{ id: string }> }
 
+const CURRENCIES = [
+  { value: 'USD', label: 'USD — US Dollar ($)' },
+  { value: 'EUR', label: 'EUR — Euro (€)' },
+  { value: 'GBP', label: 'GBP — British Pound (£)' },
+  { value: 'SAR', label: 'SAR — Saudi Riyal (﷼)' },
+  { value: 'EGP', label: 'EGP — Egyptian Pound (E£)' },
+]
+
 export default function EditProjectPage({ params }: Props) {
   const { id } = use(params)
   const router = useRouter()
@@ -21,7 +29,7 @@ export default function EditProjectPage({ params }: Props) {
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({
     name: '', code: '', description: '', status: 'active',
-    start_date: '', end_date: '',
+    currency: 'USD', usd_rate: '1', start_date: '', end_date: '',
   })
 
   useEffect(() => {
@@ -33,6 +41,8 @@ export default function EditProjectPage({ params }: Props) {
           code: data.code ?? '',
           description: data.description ?? '',
           status: data.status ?? 'active',
+          currency: data.currency ?? 'USD',
+          usd_rate: String(data.usd_rate ?? 1),
           start_date: data.start_date ?? '',
           end_date: data.end_date ?? '',
         })
@@ -54,6 +64,8 @@ export default function EditProjectPage({ params }: Props) {
       code: form.code.toUpperCase(),
       description: form.description || null,
       status: form.status,
+      currency: form.currency,
+      usd_rate: parseFloat(form.usd_rate) || 1,
       start_date: form.start_date || null,
       end_date: form.end_date || null,
     }).eq('id', id)
@@ -63,7 +75,7 @@ export default function EditProjectPage({ params }: Props) {
     router.push('/admin/projects')
   }
 
-  if (loading) return <div className="text-sm text-gray-400">Loading…</div>
+  if (loading) return <div className="text-sm text-gray-400 p-4">Loading…</div>
 
   return (
     <div className="max-w-2xl">
@@ -71,21 +83,39 @@ export default function EditProjectPage({ params }: Props) {
         <CardHeader><CardTitle>Edit Project</CardTitle></CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
+            {/* Row 1: Name + Code */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Project Name <span className="text-red-500">*</span></Label>
-                <Input value={form.name} onChange={(e) => set('name', e.target.value)} required />
+                <Input
+                  value={form.name}
+                  onChange={(e) => set('name', e.target.value)}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label>Code <span className="text-red-500">*</span></Label>
-                <Input value={form.code} onChange={(e) => set('code', e.target.value)} required className="font-mono" />
+                <Input
+                  value={form.code}
+                  onChange={(e) => set('code', e.target.value)}
+                  required
+                  className="font-mono"
+                />
               </div>
             </div>
+
+            {/* Row 2: Description */}
             <div className="space-y-2">
               <Label>Description</Label>
-              <Textarea value={form.description} onChange={(e) => set('description', e.target.value)} rows={3} />
+              <Textarea
+                value={form.description}
+                onChange={(e) => set('description', e.target.value)}
+                rows={3}
+              />
             </div>
-            <div className="grid grid-cols-3 gap-4">
+
+            {/* Row 3: Status + Currency */}
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Status</Label>
                 <Select value={form.status} onValueChange={(v) => set('status', v)}>
@@ -97,6 +127,36 @@ export default function EditProjectPage({ params }: Props) {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label>Currency <span className="text-red-500">*</span></Label>
+                <Select value={form.currency} onValueChange={(v) => set('currency', v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CURRENCIES.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Row 3b: USD Exchange Rate */}
+            <div className="space-y-2">
+              <Label>USD Exchange Rate <span className="text-gray-400 font-normal text-xs">(1 USD = X {form.currency})</span></Label>
+              <Input
+                type="number"
+                step="0.000001"
+                min="0.000001"
+                value={form.usd_rate}
+                onChange={(e) => set('usd_rate', e.target.value)}
+                placeholder="1.000000"
+                className="max-w-xs"
+              />
+              <p className="text-xs text-gray-400">Used to convert KPIs to USD in the portfolio view. Leave as 1 for USD projects.</p>
+            </div>
+
+            {/* Row 4: Dates */}
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Start Date</Label>
                 <Input type="date" value={form.start_date} onChange={(e) => set('start_date', e.target.value)} />

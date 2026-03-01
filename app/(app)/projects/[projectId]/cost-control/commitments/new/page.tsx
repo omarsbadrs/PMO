@@ -21,7 +21,7 @@ export default function NewCommitmentPage({ params }: Props) {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
     po_number: '', vendor: '', description: '',
-    amount: '', currency: 'USD', status: 'pending',
+    amount: '', currency: 'USD', fx_rate: '1', status: 'pending',
     issue_date: '', expiry_date: '',
   })
 
@@ -42,6 +42,7 @@ export default function NewCommitmentPage({ params }: Props) {
       description: form.description,
       amount: form.amount ? parseFloat(form.amount) : null,
       currency: form.currency,
+      fx_rate: parseFloat(form.fx_rate) || 1,
       status: form.status,
       issue_date: form.issue_date || null,
       expiry_date: form.expiry_date || null,
@@ -85,9 +86,15 @@ export default function NewCommitmentPage({ params }: Props) {
               <Label>Description <span className="text-red-500">*</span></Label>
               <Textarea value={form.description} onChange={(e) => set('description', e.target.value)} required rows={2} placeholder="Scope of commitment" />
             </div>
-            <div className="space-y-2">
-              <Label>Amount</Label>
-              <Input type="number" value={form.amount} onChange={(e) => set('amount', e.target.value)} placeholder="0.00" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Amount</Label>
+                <Input type="number" value={form.amount} onChange={(e) => set('amount', e.target.value)} placeholder="0.00" />
+              </div>
+              <div className="space-y-2">
+                <Label>FX Rate <span className="text-gray-400 text-xs font-normal">(doc → project)</span></Label>
+                <Input type="number" step="0.000001" min="0.000001" value={form.fx_rate} onChange={(e) => set('fx_rate', e.target.value)} placeholder="1.000000" />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
