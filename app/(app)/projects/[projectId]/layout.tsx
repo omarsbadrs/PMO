@@ -53,6 +53,11 @@ export default async function ProjectLayout({ children, params }: Props) {
     ? null
     : (moduleRolesResult.data ?? []).map((r) => DB_TO_SLUG[r.module_key] ?? r.module_key)
 
+  // Non-elevated users with zero module roles have no access to this project
+  if (allowedModules !== null && allowedModules.length === 0) {
+    redirect('/projects')
+  }
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       <AppSidebar

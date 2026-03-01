@@ -26,14 +26,33 @@ export default async function ProjectsPage() {
     .eq('id', user.id)
     .single()
 
-  // Admins and managers see all projects (bypass RLS); regular users rely on RLS + project_memberships
   const isElevated = profile?.is_global_admin || profile?.role === 'admin' || profile?.role === 'manager'
-  const projectClient = isElevated ? createAdminClient() : supabase
+  const admin = createAdminClient()
 
-  const { data: projects } = await projectClient
-    .from('projects')
-    .select('*')
-    .order('created_at', { ascending: false })
+  let projects: Project[] = []
+
+  if (isElevated) {
+    // Admins / managers see every project
+    const { data } = await admin.from('projects').select('*').order('created_at', { ascending: false })
+    projects = (data ?? []) as Project[]
+  } else {
+    // Regular users: only show projects where they have at least one module role
+    const { data: roleRows } = await admin
+      .from('module_roles')
+      .select('project_id')
+      .eq('user_id', user.id)
+
+    const accessibleIds = [...new Set((roleRows ?? []).map((r) => r.project_id))]
+
+    if (accessibleIds.length > 0) {
+      const { data } = await admin
+        .from('projects')
+        .select('*')
+        .in('id', accessibleIds)
+        .order('created_at', { ascending: false })
+      projects = (data ?? []) as Project[]
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -51,7 +70,7 @@ export default async function ProjectsPage() {
         )}
       </div>
 
-      {!projects?.length ? (
+      {!projects.length ? (
         <div className="text-center py-16 text-gray-500">
           <FolderOpen className="w-12 h-12 mx-auto mb-4 text-gray-300" />
           <p className="font-medium">No projects yet</p>

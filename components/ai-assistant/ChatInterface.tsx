@@ -13,11 +13,11 @@ interface Message {
 }
 
 const MODULE_OPTIONS = [
-  { value: 'all', label: 'All modules' },
+  { value: 'all',          label: 'All modules'  },
   { value: 'cost_control', label: 'Cost Control' },
-  { value: 'planning', label: 'Planning' },
-  { value: 'safety', label: 'Safety' },
-  { value: 'quality', label: 'Quality' },
+  { value: 'planning',     label: 'Planning'     },
+  { value: 'safety',       label: 'Safety'       },
+  { value: 'quality',      label: 'Quality'      },
 ]
 
 interface Props {
@@ -27,10 +27,23 @@ interface Props {
 export default function AiChatInterface({ projects }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
-  const [projectId, setProjectId] = useState(projects[0]?.id ?? '')
+  const [projectId, setProjectId] = useState<string>('all')
   const [moduleKey, setModuleKey] = useState('all')
   const [streaming, setStreaming] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  // Clear chat when the project changes so context is never mixed
+  function handleProjectChange(newProjectId: string) {
+    setProjectId(newProjectId)
+    setMessages([])
+    setInput('')
+  }
+
+  // Clear chat when the module scope changes
+  function handleModuleChange(newModule: string) {
+    setModuleKey(newModule)
+    setMessages([])
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -38,20 +51,22 @@ export default function AiChatInterface({ projects }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!input.trim() || !projectId || streaming) return
+    if (!input.trim() || streaming) return
 
     const userMessage = input.trim()
     setInput('')
     setMessages((prev) => [...prev, { role: 'user', content: userMessage }])
     setStreaming(true)
-
-    // Add empty assistant message placeholder
     setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
 
     const res = await fetch('/api/ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: userMessage, projectId, moduleKey: moduleKey !== 'all' ? moduleKey : undefined }),
+      body: JSON.stringify({
+        message: userMessage,
+        projectId,
+        moduleKey: moduleKey !== 'all' ? moduleKey : undefined,
+      }),
     })
 
     if (!res.ok || !res.body) {
@@ -89,26 +104,42 @@ export default function AiChatInterface({ projects }: Props) {
     }
   }
 
+  const isAllProjects = projectId === 'all'
+  const selectedProject = projects.find((p) => p.id === projectId)
+  const selectedModule = MODULE_OPTIONS.find((m) => m.value === moduleKey)
+  const scopeLabel = isAllProjects ? 'All Projects' : (selectedProject?.name ?? '')
+
   return (
     <div className="flex flex-col h-[calc(100vh-12rem)] bg-white rounded-xl border overflow-hidden">
+
       {/* Scope selectors */}
-      <div className="p-4 border-b bg-gray-50 flex gap-3 flex-wrap">
+      <div className="p-4 border-b bg-gray-50 flex gap-4 flex-wrap items-center">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-600">Project:</span>
-          <Select value={projectId} onValueChange={setProjectId}>
-            <SelectTrigger className="w-48 h-8 text-sm">
+          <Select value={projectId} onValueChange={handleProjectChange}>
+            <SelectTrigger className="w-52 h-8 text-sm">
               <SelectValue placeholder="Select project" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">
+                <span className="font-medium text-blue-600">All Projects</span>
+              </SelectItem>
+              {projects.length === 0 && (
+                <SelectItem value="_none" disabled>No projects available</SelectItem>
+              )}
               {projects.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                <SelectItem key={p.id} value={p.id}>
+                  <span className="font-medium">{p.name}</span>
+                  <span className="ml-1.5 text-xs text-gray-400">{p.code}</span>
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
+
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-600">Module:</span>
-          <Select value={moduleKey} onValueChange={setModuleKey}>
+          <Select value={moduleKey} onValueChange={handleModuleChange}>
             <SelectTrigger className="w-40 h-8 text-sm">
               <SelectValue placeholder="All modules" />
             </SelectTrigger>
@@ -119,6 +150,13 @@ export default function AiChatInterface({ projects }: Props) {
             </SelectContent>
           </Select>
         </div>
+
+        {/* Active scope badge */}
+        <span className="text-xs text-gray-400 ml-auto hidden sm:block">
+          Scope: <span className="font-medium text-gray-600">{scopeLabel}</span>
+          {' · '}
+          <span className="font-medium text-gray-600">{selectedModule?.label}</span>
+        </span>
       </div>
 
       {/* Messages */}
@@ -126,8 +164,15 @@ export default function AiChatInterface({ projects }: Props) {
         {messages.length === 0 && (
           <div className="text-center text-gray-400 py-12">
             <Bot className="w-10 h-10 mx-auto mb-3" />
-            <p className="font-medium">PMO AI Assistant</p>
-            <p className="text-sm mt-1">Ask about budgets, schedules, incidents, documents and more.</p>
+            <p className="font-medium text-gray-600">PMO AI Assistant</p>
+            <p className="text-sm mt-1">
+              {isAllProjects
+                ? `Asking across all projects · ${selectedModule?.label}`
+                : selectedProject
+                  ? `Asking about "${selectedProject.name}" · ${selectedModule?.label}`
+                  : 'Select a project to begin'}
+            </p>
+            <p className="text-xs mt-3 text-gray-300">Ask about budgets, schedules, incidents, documents and more.</p>
           </div>
         )}
 
@@ -146,7 +191,10 @@ export default function AiChatInterface({ projects }: Props) {
                 ? 'bg-blue-600 text-white rounded-tr-sm'
                 : 'bg-gray-100 text-gray-800 rounded-tl-sm'
             }`}>
-              {msg.content || (streaming && msg.role === 'assistant' ? <Loader2 className="w-4 h-4 animate-spin" /> : '')}
+              {msg.content || (streaming && msg.role === 'assistant'
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : ''
+              )}
             </div>
           </div>
         ))}
@@ -159,12 +207,16 @@ export default function AiChatInterface({ projects }: Props) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask anything about your project… (Enter to send, Shift+Enter for new line)"
+          placeholder={
+            isAllProjects
+              ? `Ask about all projects… (Enter to send, Shift+Enter for new line)`
+              : `Ask about ${selectedProject?.name ?? 'this project'}… (Enter to send, Shift+Enter for new line)`
+          }
           rows={2}
           className="resize-none"
           disabled={streaming}
         />
-        <Button type="submit" disabled={!input.trim() || !projectId || streaming} className="shrink-0">
+        <Button type="submit" disabled={!input.trim() || streaming} className="shrink-0">
           {streaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
         </Button>
       </form>

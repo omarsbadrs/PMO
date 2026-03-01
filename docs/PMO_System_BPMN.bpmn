@@ -1,0 +1,528 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             targetNamespace="http://pmo-system.app/bpmn"
+             exporter="PMO System BPMN" exporterVersion="1.0">
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- COLLABORATION: PMO System — Full Platform BPMN                  -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <collaboration id="pmo_collaboration">
+    <participant id="pool_user"      name="User / Project Team"         processRef="proc_user" />
+    <participant id="pool_frontend"  name="Frontend (Next.js App)"       processRef="proc_frontend" />
+    <participant id="pool_backend"   name="Backend (API Routes)"          processRef="proc_backend" />
+    <participant id="pool_supabase"  name="Supabase (PostgreSQL + Auth + Storage)" processRef="proc_supabase" />
+    <participant id="pool_ai"        name="AI Layer (Claude + OpenAI)"   processRef="proc_ai" />
+    <participant id="pool_powerbi"   name="PowerBI / External BI"        processRef="proc_powerbi" />
+
+    <!-- Message flows between pools -->
+    <messageFlow id="mf_login_req"       sourceRef="task_user_login"         targetRef="task_fe_auth" />
+    <messageFlow id="mf_auth_session"    sourceRef="task_be_validate_auth"   targetRef="task_fe_session" />
+    <messageFlow id="mf_data_input"      sourceRef="task_user_data_entry"    targetRef="task_fe_submit" />
+    <messageFlow id="mf_api_call"        sourceRef="task_fe_submit"          targetRef="task_be_api" />
+    <messageFlow id="mf_db_write"        sourceRef="task_be_api"             targetRef="task_db_rls" />
+    <messageFlow id="mf_db_response"     sourceRef="task_db_rls"             targetRef="task_be_api" />
+    <messageFlow id="mf_render"          sourceRef="task_be_api"             targetRef="task_fe_render" />
+    <messageFlow id="mf_ai_question"     sourceRef="task_user_ai_ask"        targetRef="task_fe_ai_send" />
+    <messageFlow id="mf_ai_api"          sourceRef="task_fe_ai_send"         targetRef="task_be_ai_route" />
+    <messageFlow id="mf_ai_rag"          sourceRef="task_be_ai_route"        targetRef="task_db_vector" />
+    <messageFlow id="mf_ai_chunks"       sourceRef="task_db_vector"          targetRef="task_be_ai_route" />
+    <messageFlow id="mf_ai_claude"       sourceRef="task_be_ai_route"        targetRef="task_ai_claude" />
+    <messageFlow id="mf_ai_stream"       sourceRef="task_ai_claude"          targetRef="task_fe_stream" />
+    <messageFlow id="mf_doc_upload"      sourceRef="task_user_doc_upload"    targetRef="task_fe_doc" />
+    <messageFlow id="mf_doc_store"       sourceRef="task_fe_doc"             targetRef="task_be_ingest" />
+    <messageFlow id="mf_embed_req"       sourceRef="task_be_ingest"          targetRef="task_ai_embed" />
+    <messageFlow id="mf_embed_resp"      sourceRef="task_ai_embed"           targetRef="task_be_ingest" />
+    <messageFlow id="mf_chunks_store"    sourceRef="task_be_ingest"          targetRef="task_db_chunks" />
+    <messageFlow id="mf_csv_upload"      sourceRef="task_user_csv"           targetRef="task_fe_csv" />
+    <messageFlow id="mf_csv_api"         sourceRef="task_fe_csv"             targetRef="task_be_import" />
+    <messageFlow id="mf_csv_db"          sourceRef="task_be_import"          targetRef="task_db_batch" />
+    <messageFlow id="mf_powerbi_conn"    sourceRef="task_admin_powerbi"      targetRef="task_powerbi_connect" />
+    <messageFlow id="mf_powerbi_query"   sourceRef="task_powerbi_connect"    targetRef="task_db_powerbi" />
+    <messageFlow id="mf_powerbi_data"    sourceRef="task_db_powerbi"         targetRef="task_powerbi_render" />
+  </collaboration>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- POOL 1: USER PROCESS                                            -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <process id="proc_user" name="User Process" isExecutable="false">
+    <laneSet id="ls_user">
+      <lane id="lane_enduser"    name="Project User" />
+      <lane id="lane_admin_user" name="Global Admin" />
+    </laneSet>
+
+    <startEvent id="start_user" name="User Opens PMO App">
+      <outgoing>sf_user_to_login</outgoing>
+    </startEvent>
+
+    <!-- AUTH -->
+    <task id="task_user_login" name="Enter Email + Password">
+      <incoming>sf_user_to_login</incoming>
+      <outgoing>sf_login_to_gw_auth</outgoing>
+    </task>
+    <exclusiveGateway id="gw_auth_result" name="Auth Valid?">
+      <incoming>sf_login_to_gw_auth</incoming>
+      <outgoing>sf_auth_fail</outgoing>
+      <outgoing>sf_auth_success</outgoing>
+    </exclusiveGateway>
+    <task id="task_user_retry" name="View Error + Retry">
+      <incoming>sf_auth_fail</incoming>
+      <outgoing>sf_retry_login</outgoing>
+    </task>
+
+    <!-- PROJECT SELECTION -->
+    <task id="task_user_select_project" name="Select Project from List">
+      <incoming>sf_auth_success</incoming>
+      <outgoing>sf_project_to_module_gw</outgoing>
+    </task>
+    <exclusiveGateway id="gw_module_select" name="Choose Module">
+      <incoming>sf_project_to_module_gw</incoming>
+      <outgoing>sf_to_cost</outgoing>
+      <outgoing>sf_to_planning</outgoing>
+      <outgoing>sf_to_safety</outgoing>
+      <outgoing>sf_to_quality</outgoing>
+      <outgoing>sf_to_ai</outgoing>
+      <outgoing>sf_to_docs</outgoing>
+    </exclusiveGateway>
+
+    <!-- COST CONTROL -->
+    <subProcess id="sub_cost" name="Cost Control Module">
+      <incoming>sf_to_cost</incoming>
+      <outgoing>sf_cost_done</outgoing>
+      <startEvent id="start_cost" />
+      <task id="task_cost_view_dash"   name="View Cost Dashboard (KPIs + Charts)" />
+      <task id="task_cost_toggle"      name="Toggle USD / Project Currency View" />
+      <task id="task_cost_budget"      name="Manage Budget Line Items" />
+      <task id="task_cost_commitment"  name="Create / Edit PO or Subcontract (with FX Rate)" />
+      <task id="task_cost_actual"      name="Record Invoice / Actual Cost (Doc Currency + FX Rate)" />
+      <task id="task_cost_forecast"    name="Enter EAC / ETC Forecast" />
+      <task id="task_cost_change"      name="Raise Change Order / Variation" />
+      <task id="task_cost_csv"         name="CSV Bulk Import" />
+      <endEvent id="end_cost" />
+    </subProcess>
+
+    <!-- PLANNING -->
+    <subProcess id="sub_planning" name="Planning Module">
+      <incoming>sf_to_planning</incoming>
+      <outgoing>sf_planning_done</outgoing>
+      <startEvent id="start_plan" />
+      <task id="task_plan_view"        name="View Planning Dashboard" />
+      <task id="task_plan_schedule"    name="Create / Update Schedule Baseline" />
+      <task id="task_plan_activity"    name="Add / Update Activity (% Complete, Dates, Status)" />
+      <task id="task_plan_milestone"   name="Add / Update Milestone" />
+      <task id="task_plan_progress"    name="Submit Period Progress Report" />
+      <endEvent id="end_plan" />
+    </subProcess>
+
+    <!-- SAFETY -->
+    <subProcess id="sub_safety" name="Safety Module">
+      <incoming>sf_to_safety</incoming>
+      <outgoing>sf_safety_done</outgoing>
+      <startEvent id="start_safety" />
+      <task id="task_safety_view"      name="View Safety Dashboard" />
+      <task id="task_safety_incident"  name="Report Safety Incident (Severity + Description)" />
+      <task id="task_safety_obs"       name="Record Safety Observation / Hazard" />
+      <endEvent id="end_safety" />
+    </subProcess>
+
+    <!-- QUALITY -->
+    <subProcess id="sub_quality" name="Quality Module">
+      <incoming>sf_to_quality</incoming>
+      <outgoing>sf_quality_done</outgoing>
+      <startEvent id="start_quality" />
+      <task id="task_quality_view"     name="View Quality Dashboard" />
+      <task id="task_quality_inspect"  name="Create Inspection Report" />
+      <task id="task_quality_ncr"      name="Raise Non-Conformance Report (NCR)" />
+      <task id="task_quality_punch"    name="Add Punch List Item" />
+      <endEvent id="end_quality" />
+    </subProcess>
+
+    <!-- DATA ENTRY (generic, for message flows) -->
+    <task id="task_user_data_entry" name="Fill Form + Submit Data">
+      <incoming>sf_to_data_entry</incoming>
+      <outgoing>sf_data_entry_done</outgoing>
+    </task>
+
+    <!-- AI ASSISTANT -->
+    <subProcess id="sub_ai_user" name="AI Assistant">
+      <incoming>sf_to_ai</incoming>
+      <outgoing>sf_ai_done</outgoing>
+      <startEvent id="start_ai_user" />
+      <task id="task_user_select_scope" name="Select Project + Module Scope" />
+      <task id="task_user_ai_ask"       name="Type Natural Language Question" />
+      <task id="task_user_read_answer"  name="Read AI Streaming Response (with source citations)" />
+      <task id="task_user_followup"     name="Ask Follow-up Question" />
+      <endEvent id="end_ai_user" />
+    </subProcess>
+
+    <!-- DOCUMENT MANAGEMENT -->
+    <subProcess id="sub_docs_user" name="Document Management">
+      <incoming>sf_to_docs</incoming>
+      <outgoing>sf_docs_done</outgoing>
+      <startEvent id="start_docs" />
+      <task id="task_user_doc_upload"  name="Upload Document (PDF / Word / Excel)" />
+      <task id="task_user_doc_view"    name="Browse Document Registry" />
+      <task id="task_user_doc_dl"      name="Download Document via Signed URL" />
+      <endEvent id="end_docs" />
+    </subProcess>
+
+    <!-- CSV IMPORT -->
+    <task id="task_user_csv" name="Upload CSV / Excel for Bulk Import">
+      <incoming>sf_to_csv</incoming>
+      <outgoing>sf_csv_done</outgoing>
+    </task>
+
+    <!-- ADMIN -->
+    <subProcess id="sub_admin_user" name="Admin Panel">
+      <incoming>sf_to_admin</incoming>
+      <outgoing>sf_admin_done</outgoing>
+      <startEvent id="start_admin" />
+      <task id="task_admin_create_project"  name="Create / Edit Project (Name, Code, Currency, USD Rate)" />
+      <task id="task_admin_create_user"     name="Create User or Send Invite Email" />
+      <task id="task_admin_assign_roles"    name="Assign Module Roles (ADMIN / INPUT / VIEWER)" />
+      <task id="task_admin_audit"           name="View Audit Log (All Changes)" />
+      <task id="task_admin_powerbi"         name="Connect PowerBI via Supabase Direct Connection" />
+      <endEvent id="end_admin" />
+    </subProcess>
+
+    <!-- End -->
+    <endEvent id="end_user" name="Session Ends" />
+
+    <sequenceFlow id="sf_user_to_login"         sourceRef="start_user"              targetRef="task_user_login" />
+    <sequenceFlow id="sf_login_to_gw_auth"       sourceRef="task_user_login"         targetRef="gw_auth_result" />
+    <sequenceFlow id="sf_auth_fail"              sourceRef="gw_auth_result"          targetRef="task_user_retry" conditionExpression="invalid credentials" />
+    <sequenceFlow id="sf_retry_login"            sourceRef="task_user_retry"         targetRef="task_user_login" />
+    <sequenceFlow id="sf_auth_success"           sourceRef="gw_auth_result"          targetRef="task_user_select_project" conditionExpression="valid session" />
+    <sequenceFlow id="sf_project_to_module_gw"  sourceRef="task_user_select_project" targetRef="gw_module_select" />
+    <sequenceFlow id="sf_to_cost"                sourceRef="gw_module_select"        targetRef="sub_cost" />
+    <sequenceFlow id="sf_to_planning"            sourceRef="gw_module_select"        targetRef="sub_planning" />
+    <sequenceFlow id="sf_to_safety"              sourceRef="gw_module_select"        targetRef="sub_safety" />
+    <sequenceFlow id="sf_to_quality"             sourceRef="gw_module_select"        targetRef="sub_quality" />
+    <sequenceFlow id="sf_to_ai"                  sourceRef="gw_module_select"        targetRef="sub_ai_user" />
+    <sequenceFlow id="sf_to_docs"                sourceRef="gw_module_select"        targetRef="sub_docs_user" />
+    <sequenceFlow id="sf_to_data_entry"          sourceRef="gw_module_select"        targetRef="task_user_data_entry" />
+    <sequenceFlow id="sf_to_csv"                 sourceRef="gw_module_select"        targetRef="task_user_csv" />
+    <sequenceFlow id="sf_to_admin"               sourceRef="gw_module_select"        targetRef="sub_admin_user" />
+    <sequenceFlow id="sf_cost_done"              sourceRef="sub_cost"                targetRef="end_user" />
+    <sequenceFlow id="sf_planning_done"          sourceRef="sub_planning"            targetRef="end_user" />
+    <sequenceFlow id="sf_safety_done"            sourceRef="sub_safety"              targetRef="end_user" />
+    <sequenceFlow id="sf_quality_done"           sourceRef="sub_quality"             targetRef="end_user" />
+    <sequenceFlow id="sf_ai_done"                sourceRef="sub_ai_user"             targetRef="end_user" />
+    <sequenceFlow id="sf_docs_done"              sourceRef="sub_docs_user"           targetRef="end_user" />
+    <sequenceFlow id="sf_data_entry_done"        sourceRef="task_user_data_entry"    targetRef="end_user" />
+    <sequenceFlow id="sf_csv_done"               sourceRef="task_user_csv"           targetRef="end_user" />
+    <sequenceFlow id="sf_admin_done"             sourceRef="sub_admin_user"          targetRef="end_user" />
+  </process>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- POOL 2: FRONTEND PROCESS (Next.js App Router)                  -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <process id="proc_frontend" name="Frontend Process" isExecutable="false">
+    <laneSet id="ls_fe">
+      <lane id="lane_fe_server" name="Server Components (RSC)" />
+      <lane id="lane_fe_client" name="Client Components" />
+    </laneSet>
+
+    <startEvent id="start_fe" name="HTTP Request Received" />
+
+    <task id="task_fe_auth"    name="Render Login Form" />
+    <task id="task_fe_session" name="Store JWT Session Cookie + Redirect to /projects" />
+    <task id="task_fe_render"  name="Server-side Render Page with Fetched Data" />
+    <task id="task_fe_submit"  name="Client: Form Submit → Call Supabase Client / API Route" />
+    <task id="task_fe_ai_send" name="Client: POST /api/ai/chat with projectId + message history" />
+    <task id="task_fe_stream"  name="Client: Read SSE Stream → Append tokens to UI in real-time" />
+    <task id="task_fe_doc"     name="Client: POST /api/documents/upload (multipart form)" />
+    <task id="task_fe_csv"     name="Client: CSV Wizard → Map Columns → POST /api/import" />
+
+    <task id="task_fe_dashboard_kpis" name="Render Project Dashboard KPIs + USD Toggle" />
+    <task id="task_fe_cc_kpis"        name="Render Cost Control KPIs + Charts (currency-aware toggle)" />
+    <task id="task_fe_charts"         name="Render Recharts (Bar, Line, Pie — project currency / USD)" />
+    <task id="task_fe_datatable"      name="Render DataTable (pagination, status badges, currency)" />
+    <task id="task_fe_modulenav"      name="Render Module Nav with live counts + currency meta" />
+
+    <endEvent id="end_fe" name="Page Rendered / Response Sent" />
+
+    <sequenceFlow id="sf_fe_start_auth"   sourceRef="start_fe"           targetRef="task_fe_auth" />
+    <sequenceFlow id="sf_fe_auth_session" sourceRef="task_fe_auth"        targetRef="task_fe_session" />
+    <sequenceFlow id="sf_fe_session_end"  sourceRef="task_fe_session"     targetRef="end_fe" />
+    <sequenceFlow id="sf_fe_render_end"   sourceRef="task_fe_render"      targetRef="end_fe" />
+    <sequenceFlow id="sf_fe_submit_end"   sourceRef="task_fe_submit"      targetRef="end_fe" />
+    <sequenceFlow id="sf_fe_ai_end"       sourceRef="task_fe_stream"      targetRef="end_fe" />
+    <sequenceFlow id="sf_fe_doc_end"      sourceRef="task_fe_doc"         targetRef="end_fe" />
+    <sequenceFlow id="sf_fe_csv_end"      sourceRef="task_fe_csv"         targetRef="end_fe" />
+    <sequenceFlow id="sf_fe_dash_end"     sourceRef="task_fe_dashboard_kpis" targetRef="end_fe" />
+  </process>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- POOL 3: BACKEND / API ROUTES                                   -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <process id="proc_backend" name="Backend API Process" isExecutable="false">
+    <laneSet id="ls_be">
+      <lane id="lane_be_auth"   name="Auth Middleware" />
+      <lane id="lane_be_routes" name="API Route Handlers" />
+    </laneSet>
+
+    <startEvent id="start_be" name="API Request Received" />
+
+    <task id="task_be_validate_auth" name="Validate JWT Session (Supabase getUser)" />
+
+    <exclusiveGateway id="gw_be_route" name="Route?">
+      <incoming>sf_be_auth_ok</incoming>
+      <outgoing>sf_be_to_api</outgoing>
+      <outgoing>sf_be_to_ai</outgoing>
+      <outgoing>sf_be_to_import</outgoing>
+      <outgoing>sf_be_to_ingest</outgoing>
+      <outgoing>sf_be_to_admin</outgoing>
+    </exclusiveGateway>
+
+    <!-- Data API -->
+    <task id="task_be_api" name="POST/GET Data — Check Role (MODULE_ADMIN / INPUT / VIEWER) — RLS" />
+
+    <!-- AI Chat -->
+    <task id="task_be_ai_route" name="POST /api/ai/chat">
+      <documentation>
+        1. Validate session + accessible project IDs
+        2. Call RAG retrieval (match_document_chunks via pgvector)
+        3. Call DB context builder (db-query.ts — keyword-based structured data fetch)
+        4. Build system prompt with project + module context
+        5. Stream Claude Sonnet 4.6 response via Anthropic SDK
+        6. Return ReadableStream (SSE)
+      </documentation>
+    </task>
+
+    <!-- CSV Import -->
+    <task id="task_be_import" name="POST /api/import">
+      <documentation>
+        1. Parse CSV / XLSX
+        2. Validate required columns
+        3. Check can_write_module() permission
+        4. Batch insert (100 rows per transaction)
+        5. Return { inserted: N, errors: [...] }
+      </documentation>
+    </task>
+
+    <!-- Document Ingestion -->
+    <task id="task_be_ingest" name="POST /api/ingest/[documentId]">
+      <documentation>
+        1. Download file from Supabase Storage
+        2. Parse: pdf-parse (PDF) / mammoth (DOCX) / xlsx (XLSX)
+        3. Chunk text (1000 token chunks, 200 overlap)
+        4. Call OpenAI text-embedding-3-small for each chunk
+        5. Upsert into document_chunks with pgvector embedding
+        6. Update documents.ingestion_status = 'done'
+      </documentation>
+    </task>
+
+    <!-- Admin API -->
+    <task id="task_be_admin" name="Admin APIs">
+      <documentation>
+        POST /api/admin/users — Create user + assign roles
+        POST /api/admin/invite — Send email invite via Supabase auth.admin
+        PUT /api/admin/users/[id]/modules — Update module_roles
+        GET /api/documents/[id]/signed-url — Generate signed download URL
+      </documentation>
+    </task>
+
+    <endEvent id="end_be" name="Response Returned" />
+
+    <sequenceFlow id="sf_be_start"      sourceRef="start_be"            targetRef="task_be_validate_auth" />
+    <sequenceFlow id="sf_be_auth_ok"    sourceRef="task_be_validate_auth" targetRef="gw_be_route" />
+    <sequenceFlow id="sf_be_to_api"     sourceRef="gw_be_route"         targetRef="task_be_api" />
+    <sequenceFlow id="sf_be_to_ai"      sourceRef="gw_be_route"         targetRef="task_be_ai_route" />
+    <sequenceFlow id="sf_be_to_import"  sourceRef="gw_be_route"         targetRef="task_be_import" />
+    <sequenceFlow id="sf_be_to_ingest"  sourceRef="gw_be_route"         targetRef="task_be_ingest" />
+    <sequenceFlow id="sf_be_to_admin"   sourceRef="gw_be_route"         targetRef="task_be_admin" />
+    <sequenceFlow id="sf_be_api_end"    sourceRef="task_be_api"         targetRef="end_be" />
+    <sequenceFlow id="sf_be_ai_end"     sourceRef="task_be_ai_route"    targetRef="end_be" />
+    <sequenceFlow id="sf_be_import_end" sourceRef="task_be_import"      targetRef="end_be" />
+    <sequenceFlow id="sf_be_ingest_end" sourceRef="task_be_ingest"      targetRef="end_be" />
+    <sequenceFlow id="sf_be_admin_end"  sourceRef="task_be_admin"       targetRef="end_be" />
+  </process>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- POOL 4: SUPABASE DATABASE                                       -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <process id="proc_supabase" name="Supabase Database Process" isExecutable="false">
+    <laneSet id="ls_db">
+      <lane id="lane_db_auth"    name="Auth (Supabase Auth)" />
+      <lane id="lane_db_rls"     name="PostgreSQL + RLS Policies" />
+      <lane id="lane_db_vector"  name="pgvector (RAG Search)" />
+      <lane id="lane_db_storage" name="Supabase Storage (Files)" />
+      <lane id="lane_db_audit"   name="Audit Trigger" />
+    </laneSet>
+
+    <startEvent id="start_db" />
+
+    <!-- Auth -->
+    <task id="task_db_auth_validate" name="Validate Credentials → Issue JWT Session" />
+
+    <!-- RLS -->
+    <task id="task_db_rls" name="Apply RLS Policies">
+      <documentation>
+        Policies check:
+        - is_global_admin()
+        - has_module_access(project_id, module_key)
+        - can_write_module(project_id, module_key)
+        - is_module_admin(project_id, module_key)
+        Tables: projects, cc_*, pl_*, sf_*, ql_*, documents, comments, actions
+      </documentation>
+    </task>
+
+    <!-- Audit Trigger -->
+    <task id="task_db_audit" name="Trigger: Write audit_log (before/after JSON snapshot)" />
+
+    <!-- Reads and Writes -->
+    <task id="task_db_read"  name="SELECT with RLS → Return rows to API" />
+    <task id="task_db_write" name="INSERT / UPDATE / DELETE with RLS → Fire audit trigger" />
+
+    <!-- Vector Search -->
+    <task id="task_db_vector" name="match_document_chunks()">
+      <documentation>
+        pgvector cosine similarity search:
+        - Filter: project_id, module_key (optional)
+        - Similarity threshold: 0.70
+        - Return top 8 chunks with content + metadata + file_name
+      </documentation>
+    </task>
+
+    <!-- Chunks Storage -->
+    <task id="task_db_chunks" name="Upsert document_chunks (embedding vector 1536-dim + content)" />
+
+    <!-- Supabase Storage -->
+    <task id="task_db_storage_upload" name="Store File in Supabase Storage (bucket: documents)" />
+    <task id="task_db_storage_signed" name="Generate Signed URL (15-min expiry)" />
+
+    <!-- Batch Import -->
+    <task id="task_db_batch" name="Batch INSERT 100 rows/transaction → Return counts + errors" />
+
+    <!-- PowerBI Direct Query -->
+    <task id="task_db_powerbi" name="PostgreSQL Direct Connection for PowerBI">
+      <documentation>
+        Supabase provides a direct PostgreSQL connection string.
+        PowerBI connects using:
+        - Host: db.[project-ref].supabase.co
+        - Port: 5432
+        - Database: postgres
+        - User: postgres (or service role)
+        - SSL: required
+        Tables available: all 23 tables + views
+        Supports: DirectQuery mode (live) or Import mode (scheduled refresh)
+      </documentation>
+    </task>
+
+    <endEvent id="end_db" />
+
+    <sequenceFlow id="sf_db_start_auth"   sourceRef="start_db"                targetRef="task_db_auth_validate" />
+    <sequenceFlow id="sf_db_auth_end"     sourceRef="task_db_auth_validate"   targetRef="end_db" />
+    <sequenceFlow id="sf_db_rls_read"     sourceRef="task_db_rls"             targetRef="task_db_read" />
+    <sequenceFlow id="sf_db_rls_write"    sourceRef="task_db_rls"             targetRef="task_db_write" />
+    <sequenceFlow id="sf_db_write_audit"  sourceRef="task_db_write"           targetRef="task_db_audit" />
+    <sequenceFlow id="sf_db_audit_end"    sourceRef="task_db_audit"           targetRef="end_db" />
+    <sequenceFlow id="sf_db_read_end"     sourceRef="task_db_read"            targetRef="end_db" />
+    <sequenceFlow id="sf_db_vector_end"   sourceRef="task_db_vector"          targetRef="end_db" />
+    <sequenceFlow id="sf_db_chunks_end"   sourceRef="task_db_chunks"          targetRef="end_db" />
+    <sequenceFlow id="sf_db_storage_end"  sourceRef="task_db_storage_upload"  targetRef="end_db" />
+    <sequenceFlow id="sf_db_signed_end"   sourceRef="task_db_storage_signed"  targetRef="end_db" />
+    <sequenceFlow id="sf_db_batch_end"    sourceRef="task_db_batch"           targetRef="end_db" />
+    <sequenceFlow id="sf_db_powerbi_end"  sourceRef="task_db_powerbi"         targetRef="end_db" />
+  </process>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- POOL 5: AI LAYER                                                -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <process id="proc_ai" name="AI Layer Process" isExecutable="false">
+    <laneSet id="ls_ai">
+      <lane id="lane_ai_claude"  name="Anthropic Claude Sonnet 4.6" />
+      <lane id="lane_ai_openai"  name="OpenAI Embeddings (text-embedding-3-small)" />
+    </laneSet>
+
+    <startEvent id="start_ai" />
+
+    <!-- Claude Chat -->
+    <task id="task_ai_claude" name="Claude Sonnet 4.6 — Stream Response">
+      <documentation>
+        Input:
+        - System prompt: project context, module scope, user role, accessible project list
+        - User messages: conversation history
+        - Context: RAG chunks (from pgvector) + structured DB data (budget, activities, incidents, etc.)
+        Output:
+        - Streaming text (SSE tokens)
+        - Source citations: [data: cc_budget] [doc: filename.pdf, p.3]
+        Model: claude-sonnet-4-6
+        SDK: @anthropic-ai/sdk (messages.stream)
+      </documentation>
+    </task>
+
+    <!-- OpenAI Embeddings -->
+    <task id="task_ai_embed" name="OpenAI text-embedding-3-small — Generate 1536-dim Vector">
+      <documentation>
+        Called during document ingestion for each text chunk.
+        Returns a 1536-dimensional float vector.
+        Stored in document_chunks.embedding (pgvector column).
+        Also called at query time to embed the user question for similarity search.
+      </documentation>
+    </task>
+
+    <endEvent id="end_ai" />
+
+    <sequenceFlow id="sf_ai_claude_end" sourceRef="task_ai_claude" targetRef="end_ai" />
+    <sequenceFlow id="sf_ai_embed_end"  sourceRef="task_ai_embed"  targetRef="end_ai" />
+  </process>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- POOL 6: POWERBI / EXTERNAL BI                                   -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <process id="proc_powerbi" name="PowerBI Process" isExecutable="false">
+    <startEvent id="start_powerbi" name="Analyst Opens PowerBI Desktop" />
+
+    <task id="task_powerbi_connect" name="Configure PostgreSQL Connector">
+      <documentation>
+        Connection string:
+        Host: db.[project-ref].supabase.co:5432
+        Database: postgres
+        Auth: Supabase DB password or service_role key
+        SSL Mode: Required
+        Mode: DirectQuery (live data) or Import (scheduled)
+      </documentation>
+    </task>
+
+    <task id="task_powerbi_model" name="Build Data Model">
+      <documentation>
+        Tables:
+        - projects (currency, usd_rate, status)
+        - cc_budget, cc_actuals, cc_commitments, cc_forecasts, cc_changes
+        - pl_activities, pl_milestones, pl_schedules
+        - sf_incidents, sf_observations
+        - ql_ncr, ql_punch, ql_inspections
+        - user_profiles, module_roles
+        Relationships: projectId FK across all module tables
+        Measures: Budget Variance, Utilization %, Schedule % Complete, Incident Rate
+      </documentation>
+    </task>
+
+    <task id="task_powerbi_render" name="Render Portfolio-Level Reports">
+      <documentation>
+        Live dashboards:
+        - Multi-project cost summary (in USD via usd_rate)
+        - Schedule progress across projects
+        - Safety KPI trends
+        - Quality NCR / punch status
+        Refreshed on DirectQuery or scheduled import
+      </documentation>
+    </task>
+
+    <task id="task_powerbi_publish" name="Publish to PowerBI Service (Web + Mobile)" />
+
+    <endEvent id="end_powerbi" name="Report Available to Stakeholders" />
+
+    <sequenceFlow id="sf_pbi_start"    sourceRef="start_powerbi"         targetRef="task_powerbi_connect" />
+    <sequenceFlow id="sf_pbi_model"    sourceRef="task_powerbi_connect"  targetRef="task_powerbi_model" />
+    <sequenceFlow id="sf_pbi_render"   sourceRef="task_powerbi_model"    targetRef="task_powerbi_render" />
+    <sequenceFlow id="sf_pbi_publish"  sourceRef="task_powerbi_render"   targetRef="task_powerbi_publish" />
+    <sequenceFlow id="sf_pbi_end"      sourceRef="task_powerbi_publish"  targetRef="end_powerbi" />
+  </process>
+
+</definitions>
